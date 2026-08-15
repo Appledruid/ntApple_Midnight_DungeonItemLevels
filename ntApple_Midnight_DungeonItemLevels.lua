@@ -1,4 +1,4 @@
--- nt.Apple's Dungeon Item Levels - Midnight Season 2 / Patch 12.1
+-- Apple's Dungeon Item Levels - Midnight Season 2 / Patch 12.1
 -- Data checked against current Midnight Season 2 / Patch 12.1 gearing information.
 -- Main view: Mythic+ rewards + Great Vault + current keystone.
 -- Additional information: Mistcrest sources, upgrade tracks, exchanges/crafting, and addon info.
@@ -418,6 +418,8 @@ mistChild:SetWidth(480)
 mistChild:SetHeight(650)
 mistScroll:SetScrollChild(mistChild)
 
+frame.mistCrestCounts = {}
+
 local mistY = -2
 for _, crest in ipairs(MISTCREST_SOURCES) do
     local icon = mistChild:CreateTexture(nil, "ARTWORK")
@@ -430,9 +432,15 @@ for _, crest in ipairs(MISTCREST_SOURCES) do
 
     local header = MakeFont(mistChild, "GameFontNormal", 12)
     header:SetPoint("TOPLEFT", 30, mistY)
-    header:SetWidth(440)
+    header:SetWidth(300)
     header:SetJustifyH("LEFT")
     header:SetText(Color(crest.name, TrackColor(crest.name:gsub(" Mistcrest", ""))))
+
+    local count = MakeFont(mistChild, "GameFontHighlight", 12)
+    count:SetPoint("TOPLEFT", 330, mistY)
+    count:SetWidth(140)
+    count:SetJustifyH("RIGHT")
+    frame.mistCrestCounts[#frame.mistCrestCounts + 1] = {currencyID = crest.currencyID, fs = count}
 
     mistY = mistY - 22
 
@@ -674,6 +682,33 @@ local function UpdateKeystoneInfo()
     frame.keystoneInfo:SetText(keyText .. "  |  " .. lootText .. vaultText)
 end
 
+-- Mistcrest currency count tracker
+local function UpdateMistcrestCounts()
+    if not frame.mistCrestCounts then
+        return
+    end
+
+    for _, entry in ipairs(frame.mistCrestCounts) do
+        local info = C_CurrencyInfo.GetCurrencyInfo(entry.currencyID)
+        if info then
+            local quantity = info.quantity or 0
+            local maxQuantity = info.maxQuantity or 0
+            local capped = maxQuantity > 0 and quantity >= maxQuantity
+
+            local text
+            if maxQuantity > 0 then
+                text = tostring(quantity) .. " / " .. tostring(maxQuantity)
+            else
+                text = tostring(quantity)
+            end
+
+            entry.fs:SetText(Color(text, capped and COLORS.red or COLORS.white))
+        else
+            entry.fs:SetText(Color("--", COLORS.muted))
+        end
+    end
+end
+
 -- Slash commands
 SLASH_DIL1 = "/dil"
 SlashCmdList["DIL"] = function(msg)
@@ -723,17 +758,22 @@ frame:Hide()
 
 frame:SetScript("OnShow", function()
     UpdateKeystoneInfo()
+    UpdateMistcrestCounts()
 end)
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+eventFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
 eventFrame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_LOGIN" then
         frame:Hide()
         UpdateKeystoneInfo()
+        UpdateMistcrestCounts()
     elseif event == "BAG_UPDATE_DELAYED" and frame:IsShown() then
         UpdateKeystoneInfo()
+    elseif event == "CURRENCY_DISPLAY_UPDATE" and frame:IsShown() then
+        UpdateMistcrestCounts()
     end
 end)
 
