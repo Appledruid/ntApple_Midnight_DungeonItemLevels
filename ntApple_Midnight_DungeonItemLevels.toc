@@ -6,6 +6,7 @@
 ## Version: 12.1.0.1
 ## IconTexture: Interface\MINIMAP\Dungeon_Icon.PNG
 ## SavedVariables: DungeonItemLevelsDB
+## X-Wago-ID: rNkyl3Ka
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
