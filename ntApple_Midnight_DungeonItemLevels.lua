@@ -145,6 +145,19 @@ local NORMAL_CONTENT = {
     {difficulty = "Seasonal Mythic Dungeons (M0)", ilvl = 292, note = "Champion 1/6"},
 }
 
+local WARBAND_ACHIEVEMENTS = {
+    {text = "Adventurer of the Mist: 282 in every armor slot", achievementID = 62410},
+    {text = "Veteran of the Mist: 295 in every armor slot", achievementID = 62411},
+    {text = "Champion of the Mist: 308 in every armor slot", achievementID = 62412},
+    {text = "Hero of the Mist: 321 in every armor slot", achievementID = 62414},
+    {text = "Myth of the Mist: 331 in every armor slot", achievementID = 62416},
+}
+
+local UPGRADE_UNLOCK_QUESTS = {
+    {name = "Equipment Seminar (Quest)", questID = 96633},
+    {name = "Upgrade Practicum (Quest)", questID = 96635},
+}
+
 local function MakeFont(parent, template, size)
     local fs = parent:CreateFontString(nil, "OVERLAY", template or "GameFontHighlight")
     if size then
@@ -419,6 +432,8 @@ mistChild:SetHeight(650)
 mistScroll:SetScrollChild(mistChild)
 
 frame.mistCrestCounts = {}
+frame.upgradeQuestTexts = {}
+frame.warbandAchievementTexts = {}
 
 local mistY = -2
 for _, crest in ipairs(MISTCREST_SOURCES) do
@@ -489,29 +504,149 @@ local function AddInfoSection(title, lines)
     otherY = otherY - 10
 end
 
-AddInfoSection("Upgrade Vendors", {
-    "Cuzolth - gear upgrades",
-    "Vaskarn - Mistcrest exchanges",
-    "Silvermoon City, near the Sanctum of Light",
-    "/way #2393 48.6 61.7",
-})
+-- Upgrade Vendors (with TomTom waypoint button)
+do
+    local h = MakeFont(otherChild, "GameFontNormal", 12)
+    h:SetPoint("TOPLEFT", 6, otherY)
+    h:SetWidth(460)
+    h:SetJustifyH("LEFT")
+    h:SetText(Color("Upgrade Vendors", COLORS.gold))
+    otherY = otherY - 22
 
-AddInfoSection("Vaskarn: Lower-Tier Exchanges", {
-    "10 Veteran -> 10 Adventurer",
-    "10 Champion -> 10 Veteran",
-    "10 Hero -> 10 Champion",
-    "10 Myth -> 10 Hero",
-    "Unlocked after Equipment Seminar + Upgrade Practicum.",
-    "Lower-tier exchanges do not count toward the weekly cap.",
-})
+    local vendorLines = {
+        "Cuzolth - gear upgrades",
+        "Vaskarn - Mistcrest exchanges",
+        "Silvermoon City, near the Sanctum of Light",
+    }
+    for _, line in ipairs(vendorLines) do
+        local fs = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+        fs:SetPoint("TOPLEFT", 10, otherY)
+        fs:SetWidth(450)
+        fs:SetJustifyH("LEFT")
+        fs:SetText(line)
+        otherY = otherY - 18
+    end
 
-AddInfoSection("Warband / 50% Discounts", {
-    "Adventurer of the Mist: 282 in every armor slot",
-    "Veteran of the Mist: 295 in every armor slot",
-    "Champion of the Mist: 308 in every armor slot",
-    "Hero of the Mist: 321 in every armor slot",
-    "Myth of the Mist: 331 in every armor slot",
-})
+    local WAYPOINT_MAP_ID = 2393
+    local WAYPOINT_X = 48.6
+    local WAYPOINT_Y = 61.7
+
+    local wayText = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+    wayText:SetPoint("TOPLEFT", 10, otherY)
+    wayText:SetWidth(150)
+    wayText:SetJustifyH("LEFT")
+    wayText:SetText("/way #" .. WAYPOINT_MAP_ID .. " " .. WAYPOINT_X .. " " .. WAYPOINT_Y)
+
+    local wayButton = CreateFrame("Button", nil, otherChild, "UIPanelButtonTemplate")
+    wayButton:SetSize(90, 18)
+    wayButton:SetPoint("LEFT", wayText, "RIGHT", 8, 1)
+    wayButton:SetText("Set Waypoint")
+
+    wayButton:SetScript("OnClick", function()
+        if TomTom and TomTom.AddWaypoint then
+            TomTom:AddWaypoint(WAYPOINT_MAP_ID, WAYPOINT_X / 100, WAYPOINT_Y / 100, {
+                title = "Upgrade Vendors (Cuzolth / Vaskarn)",
+                persistent = false,
+            })
+            print(Color("Apple's Dungeon Item Levels: ", COLORS.gold) .. "Waypoint set for the Upgrade Vendors.")
+        else
+            print(Color("Apple's Dungeon Item Levels: ", COLORS.red) .. "TomTom addon not found. Install TomTom to use this button.")
+        end
+    end)
+
+    wayButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Set TomTom Waypoint", 1, 1, 1)
+        GameTooltip:AddLine("Cuzolth / Vaskarn - Upgrade Vendors", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Requires the TomTom addon", 1, 0.4, 0.4)
+        GameTooltip:Show()
+    end)
+    wayButton:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    otherY = otherY - 18
+
+    local note = MakeFont(otherChild, "GameFontHighlightSmall", 9)
+    note:SetPoint("TOPLEFT", 10, otherY)
+    note:SetWidth(450)
+    note:SetJustifyH("LEFT")
+    note:SetText(Color("(Requires TomTom addon)", COLORS.muted))
+    otherY = otherY - 18
+
+    otherY = otherY - 10
+end
+
+-- Vaskarn: Lower-Tier Exchanges (with quest completion tracking)
+do
+    local h = MakeFont(otherChild, "GameFontNormal", 12)
+    h:SetPoint("TOPLEFT", 6, otherY)
+    h:SetWidth(460)
+    h:SetJustifyH("LEFT")
+    h:SetText(Color("Vaskarn: Lower-Tier Exchanges", COLORS.gold))
+    otherY = otherY - 22
+
+    local exchangeLines = {
+        "10 Veteran -> 10 Adventurer",
+        "10 Champion -> 10 Veteran",
+        "10 Hero -> 10 Champion",
+        "10 Myth -> 10 Hero",
+    }
+    for _, line in ipairs(exchangeLines) do
+        local fs = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+        fs:SetPoint("TOPLEFT", 10, otherY)
+        fs:SetWidth(450)
+        fs:SetJustifyH("LEFT")
+        fs:SetText(line)
+        otherY = otherY - 18
+    end
+
+    local reqLine = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+    reqLine:SetPoint("TOPLEFT", 10, otherY)
+    reqLine:SetWidth(450)
+    reqLine:SetJustifyH("LEFT")
+    reqLine:SetText("Requires completing these quests:")
+    otherY = otherY - 17
+
+    for _, quest in ipairs(UPGRADE_UNLOCK_QUESTS) do
+        local qfs = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+        qfs:SetPoint("TOPLEFT", 20, otherY)
+        qfs:SetWidth(440)
+        qfs:SetJustifyH("LEFT")
+        frame.upgradeQuestTexts[#frame.upgradeQuestTexts + 1] = {questID = quest.questID, name = quest.name, fs = qfs}
+        otherY = otherY - 16
+    end
+
+    local capLine = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+    capLine:SetPoint("TOPLEFT", 10, otherY)
+    capLine:SetWidth(450)
+    capLine:SetJustifyH("LEFT")
+    capLine:SetText("Lower-tier exchanges do not count toward the weekly cap.")
+    otherY = otherY - 18
+
+    otherY = otherY - 10
+end
+
+-- Warband / 50% Discounts (with achievement completion tracking)
+do
+    local h = MakeFont(otherChild, "GameFontNormal", 12)
+    h:SetPoint("TOPLEFT", 6, otherY)
+    h:SetWidth(460)
+    h:SetJustifyH("LEFT")
+    h:SetText(Color("Warband / 50% Discounts", COLORS.gold))
+    otherY = otherY - 22
+
+    for _, entry in ipairs(WARBAND_ACHIEVEMENTS) do
+        local fs = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+        fs:SetPoint("TOPLEFT", 10, otherY)
+        fs:SetWidth(450)
+        fs:SetJustifyH("LEFT")
+        frame.warbandAchievementTexts[#frame.warbandAchievementTexts + 1] = {achievementID = entry.achievementID, text = entry.text, fs = fs}
+        otherY = otherY - 18
+    end
+
+    otherY = otherY - 10
+end
 
 AddInfoSection("Profession Crafting", {
     "Rare: 266-279 - 80 Adventurer Mistcrests",
@@ -709,6 +844,31 @@ local function UpdateMistcrestCounts()
     end
 end
 
+-- Upgrade-unlock quest tracker (Equipment Seminar / Upgrade Practicum)
+local function UpdateUpgradeQuests()
+    if not frame.upgradeQuestTexts then
+        return
+    end
+
+    for _, entry in ipairs(frame.upgradeQuestTexts) do
+        local done = C_QuestLog.IsQuestFlaggedCompleted(entry.questID)
+        local statusText = done and " - Complete" or " - Incomplete"
+        entry.fs:SetText(Color(entry.name .. statusText, done and COLORS.veteran or COLORS.red))
+    end
+end
+
+-- Warband discount achievement tracker
+local function UpdateWarbandAchievements()
+    if not frame.warbandAchievementTexts then
+        return
+    end
+
+    for _, entry in ipairs(frame.warbandAchievementTexts) do
+        local completed = select(4, GetAchievementInfo(entry.achievementID))
+        entry.fs:SetText(Color(entry.text, completed and COLORS.veteran or COLORS.red))
+    end
+end
+
 -- Slash commands
 SLASH_DIL1 = "/dil"
 SlashCmdList["DIL"] = function(msg)
@@ -759,21 +919,31 @@ frame:Hide()
 frame:SetScript("OnShow", function()
     UpdateKeystoneInfo()
     UpdateMistcrestCounts()
+    UpdateUpgradeQuests()
+    UpdateWarbandAchievements()
 end)
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
+eventFrame:RegisterEvent("QUEST_TURNED_IN")
+eventFrame:RegisterEvent("ACHIEVEMENT_EARNED")
 eventFrame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_LOGIN" then
         frame:Hide()
         UpdateKeystoneInfo()
         UpdateMistcrestCounts()
+        UpdateUpgradeQuests()
+        UpdateWarbandAchievements()
     elseif event == "BAG_UPDATE_DELAYED" and frame:IsShown() then
         UpdateKeystoneInfo()
     elseif event == "CURRENCY_DISPLAY_UPDATE" and frame:IsShown() then
         UpdateMistcrestCounts()
+    elseif event == "QUEST_TURNED_IN" and frame:IsShown() then
+        UpdateUpgradeQuests()
+    elseif event == "ACHIEVEMENT_EARNED" and frame:IsShown() then
+        UpdateWarbandAchievements()
     end
 end)
 
