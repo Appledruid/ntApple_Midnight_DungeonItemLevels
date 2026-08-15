@@ -1,0 +1,15 @@
+## Interface: 120100
+## Title: |cffffffffApples Dungeon Item Levels|r |cfffe6100(Midnight)|r
+## Notes: Displays Midnight Season 2 Mythic+ loot, Great Vault rewards, Mistcrest sources, and gear upgrade tracks.
+## Author: nt.Apple
+## DefaultState: enabled
+## Version: 12.1.0
+## IconTexture: Interface\MINIMAP\Dungeon_Icon.PNG
+## SavedVariables: DungeonItemLevelsDB
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+ntApple_Midnight_DungeonItemLevels.lua
