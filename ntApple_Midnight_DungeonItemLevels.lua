@@ -328,9 +328,8 @@ abyssTitle:SetPoint("TOP", 0, -8)
 abyssTitle:SetText(Color("THE VENOMOUS ABYSS - EXTENDED MYTHIC ITEM LEVELS", COLORS.myth))
 
 local abyssHeaders = {
-    {"Rank", 10, 130},
-    {"Item Level", 145, 110},
-    {"Status", 275, 335},
+    {"Rank", 60, 260},
+    {"Item Level", 324, 260},
 }
 for _, h in ipairs(abyssHeaders) do
     local fs = MakeFont(abyssPanel, "GameFontNormal", 10)
@@ -344,22 +343,16 @@ for i, row in ipairs(VENOMOUS_ABYSS_MYTH) do
     local y = -42 - ((i - 1) * 20)
 
     local rank = MakeFont(abyssPanel, "GameFontHighlight", 11)
-    rank:SetPoint("TOPLEFT", 10, y)
-    rank:SetWidth(130)
+    rank:SetPoint("TOPLEFT", 60, y)
+    rank:SetWidth(260)
     rank:SetJustifyH("CENTER")
     rank:SetText(Color(row.rank, COLORS.myth))
 
     local ilvl = MakeFont(abyssPanel, "GameFontHighlight", 11)
-    ilvl:SetPoint("TOPLEFT", 145, y)
-    ilvl:SetWidth(110)
+    ilvl:SetPoint("TOPLEFT", 324, y)
+    ilvl:SetWidth(260)
     ilvl:SetJustifyH("CENTER")
     ilvl:SetText(Color(tostring(row.ilvl), COLORS.gold))
-
-    local source = MakeFont(abyssPanel, "GameFontHighlightSmall", 10)
-    source:SetPoint("TOPLEFT", 275, y)
-    source:SetWidth(335)
-    source:SetJustifyH("CENTER")
-    source:SetText(Color("Extended Mythic level", COLORS.white))
 end
 
 -- Current keystone area
@@ -380,7 +373,7 @@ local CHAT_CHANNEL_OPTIONS = {
 frame.selectedChatChannel = "SAY"
 
 local chatDropdown = CreateFrame("Frame", "DungeonItemLevelsChatDropdown", main, "UIDropDownMenuTemplate")
-chatDropdown:SetPoint("BOTTOMLEFT", main, "BOTTOMLEFT", 4, 4)
+chatDropdown:SetPoint("BOTTOM", main, "BOTTOM", -50, 4)
 UIDropDownMenu_SetWidth(chatDropdown, 90)
 UIDropDownMenu_SetText(chatDropdown, "Say")
 
