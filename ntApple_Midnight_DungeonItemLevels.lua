@@ -234,6 +234,133 @@ local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", -10, -10)
 close:SetScript("OnClick", function() frame:Hide() end)
 
+DungeonItemLevelsDB = DungeonItemLevelsDB or {}
+
+-- Hide WoW UI toggle. Off by default and reset every time the window opens,
+-- unless overridden via the settings gear below. Uses UIParent:Hide(), which
+-- covers other addons too (not just the default UI) - this window is
+-- reparented to WorldFrame while hidden so it isn't hidden along with
+-- everything else, with scale compensated so its size doesn't change, and a
+-- defensive re-show guard in case any of this ever leaves it unexpectedly hidden.
+local function SetHideWowUI(hidden)
+    local wasShown = frame:IsShown()
+
+    if hidden then
+        frame:SetScale(UIParent:GetEffectiveScale())
+        frame:SetParent(WorldFrame)
+        UIParent:Hide()
+    else
+        UIParent:Show()
+        frame:SetParent(UIParent)
+        frame:SetScale(1)
+    end
+
+    if wasShown and not frame:IsShown() then
+        frame:Show()
+    end
+end
+
+local hideUICheckbox = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+hideUICheckbox:SetSize(20, 20)
+hideUICheckbox:SetPoint("BOTTOMLEFT", 25, 27)
+hideUICheckbox:SetChecked(false)
+
+local hideUILabel = MakeFont(frame, "GameFontHighlightSmall", 10)
+hideUILabel:SetPoint("LEFT", hideUICheckbox, "RIGHT", 4, 0)
+hideUILabel:SetText("Hide WoW UI")
+
+hideUICheckbox:SetScript("OnClick", function(self)
+    SetHideWowUI(self:GetChecked())
+end)
+
+hideUICheckbox:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Hide WoW UI", 1, 1, 1)
+    GameTooltip:AddLine("Hides the default game UI while this window is open.", 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+hideUICheckbox:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+end)
+
+-- Settings gear: lets the user permanently override the off-by-default behavior
+local hideUIGear = CreateFrame("Button", nil, frame)
+hideUIGear:SetSize(16, 16)
+hideUIGear:SetPoint("LEFT", hideUILabel, "RIGHT", 6, 0)
+hideUIGear:SetNormalTexture("Interface\\Icons\\Trade_Engineering")
+hideUIGear:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+
+local hideUIScopeNote = MakeFont(frame, "GameFontHighlightSmall", 9)
+hideUIScopeNote:SetPoint("LEFT", hideUIGear, "RIGHT", 6, 0)
+hideUIScopeNote:SetText(Color("(Only applies while this window is open)", COLORS.muted))
+
+local hideUISettingsPopup = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+hideUISettingsPopup:SetSize(230, 56)
+hideUISettingsPopup:SetPoint("TOPLEFT", hideUIGear, "BOTTOMLEFT", -20, -30)
+Mixin(hideUISettingsPopup, BackdropTemplateMixin)
+hideUISettingsPopup:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true,
+    tileSize = 16,
+    edgeSize = 12,
+    insets = {left = 3, right = 3, top = 3, bottom = 3},
+})
+hideUISettingsPopup:SetBackdropColor(0.015, 0.015, 0.015, 0.96)
+hideUISettingsPopup:SetBackdropBorderColor(0.35, 0.35, 0.35, 0.8)
+hideUISettingsPopup:SetFrameStrata("TOOLTIP")
+hideUISettingsPopup:Hide()
+
+local alwaysHideCheckbox = CreateFrame("CheckButton", nil, hideUISettingsPopup, "UICheckButtonTemplate")
+alwaysHideCheckbox:SetSize(20, 20)
+alwaysHideCheckbox:SetPoint("TOPLEFT", 8, -8)
+
+local alwaysHideLabel = MakeFont(hideUISettingsPopup, "GameFontHighlightSmall", 10)
+alwaysHideLabel:SetPoint("LEFT", alwaysHideCheckbox, "RIGHT", 4, 0)
+alwaysHideLabel:SetWidth(190)
+alwaysHideLabel:SetJustifyH("LEFT")
+alwaysHideLabel:SetText("Always hide WoW UI when this window opens")
+
+alwaysHideCheckbox:SetScript("OnClick", function(self)
+    local checked = self:GetChecked() and true or false
+    DungeonItemLevelsDB.alwaysHideWowUI = checked
+
+    if checked then
+        hideUICheckbox:SetChecked(true)
+        SetHideWowUI(true)
+    end
+end)
+
+hideUIGear:SetScript("OnClick", function()
+    if hideUISettingsPopup:IsShown() then
+        hideUISettingsPopup:Hide()
+    else
+        alwaysHideCheckbox:SetChecked(DungeonItemLevelsDB.alwaysHideWowUI and true or false)
+        hideUISettingsPopup:Show()
+    end
+end)
+
+hideUIGear:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Hide WoW UI Settings", 1, 1, 1)
+    GameTooltip:Show()
+end)
+hideUIGear:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+end)
+
+frame:HookScript("OnShow", function()
+    local defaultHidden = DungeonItemLevelsDB.alwaysHideWowUI and true or false
+    hideUICheckbox:SetChecked(defaultHidden)
+    SetHideWowUI(defaultHidden)
+end)
+
+frame:HookScript("OnHide", function()
+    hideUISettingsPopup:Hide()
+    hideUICheckbox:SetChecked(false)
+    SetHideWowUI(false)
+end)
+
 -- Main content panel
 local main = CreatePanel(frame, 680, 570, "TOPLEFT", frame, "TOPLEFT", 25, -82)
 
@@ -1039,7 +1166,7 @@ frame:SelectTab(1)
 frame:SetSideShown(true)
 frame:Hide()
 
-frame:SetScript("OnShow", function()
+frame:HookScript("OnShow", function()
     UpdateKeystoneInfo()
     UpdateMistcrestCounts()
     UpdateUpgradeQuests()
