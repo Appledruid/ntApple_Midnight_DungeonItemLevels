@@ -321,7 +321,7 @@ if level12Key then
 end
 
 -- Extended Myth section
-local abyssPanel = CreatePanel(main, 644, 115, "BOTTOMLEFT", main, "BOTTOMLEFT", 18, 42)
+local abyssPanel = CreatePanel(main, 644, 115, "BOTTOMLEFT", main, "BOTTOMLEFT", 18, 70)
 
 local abyssTitle = MakeFont(abyssPanel, "GameFontNormal", 12)
 abyssTitle:SetPoint("TOP", 0, -8)
@@ -364,10 +364,108 @@ end
 
 -- Current keystone area
 frame.keystoneInfo = MakeFont(main, "GameFontHighlight", 11)
-frame.keystoneInfo:SetPoint("BOTTOMLEFT", 18, 12)
-frame.keystoneInfo:SetPoint("BOTTOMRIGHT", -18, 12)
+frame.keystoneInfo:SetPoint("BOTTOMLEFT", 18, 44)
+frame.keystoneInfo:SetPoint("BOTTOMRIGHT", -18, 44)
 frame.keystoneInfo:SetHeight(22)
 frame.keystoneInfo:SetJustifyH("CENTER")
+
+-- Keystone announcer: chat channel dropdown + announce button
+local CHAT_CHANNEL_OPTIONS = {
+    {text = "Say", value = "SAY"},
+    {text = "Guild", value = "GUILD"},
+    {text = "Party", value = "PARTY"},
+    {text = "Raid", value = "RAID"},
+}
+
+frame.selectedChatChannel = "SAY"
+
+local chatDropdown = CreateFrame("Frame", "DungeonItemLevelsChatDropdown", main, "UIDropDownMenuTemplate")
+chatDropdown:SetPoint("BOTTOMLEFT", main, "BOTTOMLEFT", 4, 4)
+UIDropDownMenu_SetWidth(chatDropdown, 90)
+UIDropDownMenu_SetText(chatDropdown, "Say")
+
+local function ChatDropdown_OnClick(self)
+    frame.selectedChatChannel = self.value
+    UIDropDownMenu_SetText(chatDropdown, self:GetText())
+end
+
+UIDropDownMenu_Initialize(chatDropdown, function(self, level)
+    for _, option in ipairs(CHAT_CHANNEL_OPTIONS) do
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = option.text
+        info.value = option.value
+        info.func = ChatDropdown_OnClick
+        info.checked = (frame.selectedChatChannel == option.value)
+        UIDropDownMenu_AddButton(info, level)
+    end
+end)
+
+local function FindKeystoneLink()
+    if not (C_Item and C_Item.IsItemKeystoneByID) then
+        return nil
+    end
+
+    for bag = 0, NUM_BAG_SLOTS do
+        local numSlots = C_Container.GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local itemID = C_Container.GetContainerItemID(bag, slot)
+            if itemID and C_Item.IsItemKeystoneByID(itemID) then
+                local itemLink = C_Container.GetContainerItemLink(bag, slot)
+                if itemLink then
+                    return itemLink
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function AnnounceKeystone(channel)
+    local level = C_MythicPlus.GetOwnedKeystoneLevel()
+    if not level or level < 2 then
+        print(Color("Apple's Dungeon Item Levels: ", COLORS.red) .. "No keystone found in your inventory to announce.")
+        return
+    end
+
+    local keystoneLink = FindKeystoneLink()
+    if not keystoneLink then
+        print(Color("Apple's Dungeon Item Levels: ", COLORS.red) .. "Could not find your keystone item to link.")
+        return
+    end
+
+    local message = "My Key: " .. keystoneLink
+
+    if channel == "SAY" then
+        SendChatMessage(message, "SAY")
+    elseif channel == "GUILD" then
+        if IsInGuild() then
+            SendChatMessage(message, "GUILD")
+        else
+            print(Color("Apple's Dungeon Item Levels: ", COLORS.red) .. "You are not in a guild.")
+        end
+    elseif channel == "PARTY" then
+        if IsInGroup() then
+            SendChatMessage(message, "PARTY")
+        else
+            print(Color("Apple's Dungeon Item Levels: ", COLORS.red) .. "You are not in a party.")
+        end
+    elseif channel == "RAID" then
+        if IsInRaid() then
+            SendChatMessage(message, "RAID")
+        else
+            print(Color("Apple's Dungeon Item Levels: ", COLORS.red) .. "You are not in a raid.")
+        end
+    end
+end
+
+local announceButton = CreateFrame("Button", nil, main, "UIPanelButtonTemplate")
+announceButton:SetSize(110, 22)
+announceButton:SetPoint("LEFT", chatDropdown, "RIGHT", -6, 3)
+announceButton:SetText("Key Announcer")
+announceButton:SetScript("OnClick", function()
+    AnnounceKeystone(frame.selectedChatChannel)
+end)
 
 -- Right-side information sheet
 local side = CreatePanel(frame, 530, 570, "TOPRIGHT", frame, "TOPRIGHT", -25, -82)
@@ -420,6 +518,23 @@ frame.SelectTab = function(_, index)
     end
 end
 
+local function EnableSmoothScroll(scrollFrame, step)
+    step = step or 20
+    scrollFrame:EnableMouseWheel(true)
+    scrollFrame:SetScript("OnMouseWheel", function(self, delta)
+        local newScroll = self:GetVerticalScroll() - (delta * step)
+        local maxScroll = self:GetVerticalScrollRange()
+
+        if newScroll < 0 then
+            newScroll = 0
+        elseif newScroll > maxScroll then
+            newScroll = maxScroll
+        end
+
+        self:SetVerticalScroll(newScroll)
+    end)
+end
+
 -- Tab 1: Mistcrest sources
 local mistPanel = tabPanels[1]
 local mistScroll = CreateFrame("ScrollFrame", nil, mistPanel, "UIPanelScrollFrameTemplate")
@@ -430,6 +545,7 @@ local mistChild = CreateFrame("Frame", nil, mistScroll)
 mistChild:SetWidth(480)
 mistChild:SetHeight(650)
 mistScroll:SetScrollChild(mistChild)
+EnableSmoothScroll(mistScroll, 20)
 
 frame.mistCrestCounts = {}
 frame.upgradeQuestTexts = {}
@@ -481,6 +597,7 @@ local otherChild = CreateFrame("Frame", nil, otherScroll)
 otherChild:SetWidth(480)
 otherChild:SetHeight(750)
 otherScroll:SetScrollChild(otherChild)
+EnableSmoothScroll(otherScroll, 20)
 
 local otherY = -2
 
@@ -558,7 +675,6 @@ do
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText("Set TomTom Waypoint", 1, 1, 1)
         GameTooltip:AddLine("Cuzolth / Vaskarn - Upgrade Vendors", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("Requires the TomTom addon", 1, 0.4, 0.4)
         GameTooltip:Show()
     end)
     wayButton:SetScript("OnLeave", function()
@@ -571,7 +687,7 @@ do
     note:SetPoint("TOPLEFT", 10, otherY)
     note:SetWidth(450)
     note:SetJustifyH("LEFT")
-    note:SetText(Color("(Requires TomTom addon)", COLORS.muted))
+    frame.tomtomNote = note
     otherY = otherY - 18
 
     otherY = otherY - 10
@@ -869,6 +985,20 @@ local function UpdateWarbandAchievements()
     end
 end
 
+-- TomTom detection - only warn if it's actually missing
+local function UpdateTomTomNote()
+    if not frame.tomtomNote then
+        return
+    end
+
+    if TomTom and TomTom.AddWaypoint then
+        frame.tomtomNote:Hide()
+    else
+        frame.tomtomNote:SetText(Color("TomTom addon not detected - enable/install it to use this waypoint button.", COLORS.red))
+        frame.tomtomNote:Show()
+    end
+end
+
 -- Slash commands
 SLASH_DIL1 = "/dil"
 SlashCmdList["DIL"] = function(msg)
@@ -936,6 +1066,7 @@ eventFrame:SetScript("OnEvent", function(_, event)
         UpdateMistcrestCounts()
         UpdateUpgradeQuests()
         UpdateWarbandAchievements()
+        UpdateTomTomNote()
     elseif event == "BAG_UPDATE_DELAYED" and frame:IsShown() then
         UpdateKeystoneInfo()
     elseif event == "CURRENCY_DISPLAY_UPDATE" and frame:IsShown() then
