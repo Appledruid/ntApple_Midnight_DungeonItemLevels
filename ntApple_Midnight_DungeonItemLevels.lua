@@ -587,6 +587,112 @@ announceButton:SetScript("OnClick", function()
     AnnounceKeystone(frame.selectedChatChannel)
 end)
 
+-- Floating keystone icon decorations (bottom corners of the main panel).
+-- Only shown when a keystone is actually owned, since that uses the real
+-- item icon rather than guessing at a generic keystone texture path.
+local function GetKeystoneIcon()
+    if not (C_Item and C_Item.IsItemKeystoneByID) then
+        return nil
+    end
+
+    for bag = 0, NUM_BAG_SLOTS do
+        local numSlots = C_Container.GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local itemID = C_Container.GetContainerItemID(bag, slot)
+            if itemID and C_Item.IsItemKeystoneByID(itemID) then
+                local info = C_Container.GetContainerItemInfo(bag, slot)
+                if info and info.iconFileID then
+                    return info.iconFileID
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function CreateFloatingKeystoneIcon(anchorPoint, xOffset)
+    local container = CreateFrame("Frame", nil, main)
+    container:SetSize(40, 40)
+    container:SetPoint(anchorPoint, main, anchorPoint, xOffset, 8)
+    container:Hide()
+
+    local glow = container:CreateTexture(nil, "BACKGROUND")
+    glow:SetSize(60, 60)
+    glow:SetPoint("CENTER")
+    glow:SetTexture("Interface\\Cooldown\\star4")
+    glow:SetBlendMode("ADD")
+    glow:SetVertexColor(1, 0.82, 0.2, 0.7)
+
+    local icon = container:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(32, 32)
+    icon:SetPoint("CENTER")
+
+    local glowAnim = glow:CreateAnimationGroup()
+    glowAnim:SetLooping("REPEAT")
+
+    local spin = glowAnim:CreateAnimation("Rotation")
+    spin:SetDegrees(360)
+    spin:SetDuration(6)
+    spin:SetOrder(1)
+
+    local pulseUp = glowAnim:CreateAnimation("Alpha")
+    pulseUp:SetFromAlpha(0.3)
+    pulseUp:SetToAlpha(0.9)
+    pulseUp:SetDuration(1.2)
+    pulseUp:SetOrder(1)
+
+    local pulseDown = glowAnim:CreateAnimation("Alpha")
+    pulseDown:SetFromAlpha(0.9)
+    pulseDown:SetToAlpha(0.3)
+    pulseDown:SetDuration(1.2)
+    pulseDown:SetOrder(2)
+
+    glowAnim:Play()
+
+    local bobAnim = container:CreateAnimationGroup()
+    bobAnim:SetLooping("REPEAT")
+
+    local bobUp = bobAnim:CreateAnimation("Translation")
+    bobUp:SetOffset(0, 8)
+    bobUp:SetDuration(1.6)
+    bobUp:SetSmoothing("IN_OUT")
+    bobUp:SetOrder(1)
+
+    local bobDown = bobAnim:CreateAnimation("Translation")
+    bobDown:SetOffset(0, -8)
+    bobDown:SetDuration(1.6)
+    bobDown:SetSmoothing("IN_OUT")
+    bobDown:SetOrder(2)
+
+    bobAnim:Play()
+
+    return container, icon, bobAnim
+end
+
+local leftFloatIcon, leftFloatTexture = CreateFloatingKeystoneIcon("BOTTOMLEFT", 45)
+local rightFloatIcon, rightFloatTexture, rightBobAnim = CreateFloatingKeystoneIcon("BOTTOMRIGHT", -45)
+
+-- Restart the right side's bob slightly offset so the two never move in lockstep
+C_Timer.After(0.5, function()
+    rightBobAnim:Stop()
+    rightBobAnim:Play()
+end)
+
+local function UpdateFloatingKeystoneIcons()
+    local iconFileID = GetKeystoneIcon()
+
+    if iconFileID then
+        leftFloatTexture:SetTexture(iconFileID)
+        rightFloatTexture:SetTexture(iconFileID)
+        leftFloatIcon:Show()
+        rightFloatIcon:Show()
+    else
+        leftFloatIcon:Hide()
+        rightFloatIcon:Hide()
+    end
+end
+
 -- Right-side information sheet
 local side = CreatePanel(frame, 530, 570, "TOPRIGHT", frame, "TOPRIGHT", -25, -82)
 frame.side = side
@@ -1171,6 +1277,7 @@ frame:HookScript("OnShow", function()
     UpdateMistcrestCounts()
     UpdateUpgradeQuests()
     UpdateWarbandAchievements()
+    UpdateFloatingKeystoneIcons()
 end)
 
 local eventFrame = CreateFrame("Frame")
@@ -1187,8 +1294,10 @@ eventFrame:SetScript("OnEvent", function(_, event)
         UpdateUpgradeQuests()
         UpdateWarbandAchievements()
         UpdateTomTomNote()
+        UpdateFloatingKeystoneIcons()
     elseif event == "BAG_UPDATE_DELAYED" and frame:IsShown() then
         UpdateKeystoneInfo()
+        UpdateFloatingKeystoneIcons()
     elseif event == "CURRENCY_DISPLAY_UPDATE" and frame:IsShown() then
         UpdateMistcrestCounts()
     elseif event == "QUEST_TURNED_IN" and frame:IsShown() then
