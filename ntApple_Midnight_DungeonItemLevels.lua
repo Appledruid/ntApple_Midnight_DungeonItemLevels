@@ -61,12 +61,6 @@ local UPGRADE_TRACKS = {
     },
 }
 
-local VENOMOUS_ABYSS_MYTH = {
-    { rank = "Myth 7/6", ilvl = 337, source = "The Venomous Abyss extended Mythic item levels" },
-    { rank = "Myth 8/6", ilvl = 341, source = "The Venomous Abyss extended Mythic item levels" },
-    { rank = "Myth 9/6", ilvl = 344, source = "The Venomous Abyss extended Mythic item levels" },
-}
-
 local MYTHIC_PLUS = {
     [2]  = {loot = 295, lootTrack = "Champion", lootRank = 2, crest = "Champion", vault = 305, vaultTrack = "Hero", vaultRank = 1},
     [3]  = {loot = 295, lootTrack = "Champion", lootRank = 2, crest = "Champion", vault = 305, vaultTrack = "Hero", vaultRank = 1},
@@ -158,15 +152,30 @@ local UPGRADE_UNLOCK_QUESTS = {
     {name = "Upgrade Practicum (Quest)", questID = 96635},
 }
 
+local CREST_CURRENCY_ID = {
+    Adventurer = 3442,
+    Veteran = 3443,
+    Champion = 3444,
+    Hero = 3445,
+    Myth = 3446,
+}
+
+local LOWER_TIER_EXCHANGES = {
+    {fromTier = "Veteran", toTier = "Adventurer"},
+    {fromTier = "Champion", toTier = "Veteran"},
+    {fromTier = "Hero", toTier = "Champion"},
+    {fromTier = "Myth", toTier = "Hero"},
+}
+
 -- Achievement-gated upgrade exchanges (Vaskarn): trades 30 of a lower-tier
 -- Mistcrest for 10 of the next tier up. Counts toward the weekly cap, unlike
 -- the quest-gated Lower-Tier Exchanges. Each is unlocked by the Warband
 -- achievement for the tier being exchanged FROM.
 local UPGRADE_EXCHANGES = {
-    {text = "30 Adventurer -> 10 Veteran", achievementID = 62410},
-    {text = "30 Veteran -> 10 Champion", achievementID = 62411},
-    {text = "30 Champion -> 10 Hero", achievementID = 62412},
-    {text = "30 Hero -> 10 Myth", achievementID = 62414},
+    {text = "30 Adventurer -> 10 Veteran", fromTier = "Adventurer", toTier = "Veteran", achievementID = 62410},
+    {text = "30 Veteran -> 10 Champion", fromTier = "Veteran", toTier = "Champion", achievementID = 62411},
+    {text = "30 Champion -> 10 Hero", fromTier = "Champion", toTier = "Hero", achievementID = 62412},
+    {text = "30 Hero -> 10 Myth", fromTier = "Hero", toTier = "Myth", achievementID = 62414},
 }
 
 local function MakeFont(parent, template, size)
@@ -294,71 +303,12 @@ hideUICheckbox:SetScript("OnLeave", function()
     GameTooltip:Hide()
 end)
 
--- Settings gear: lets the user permanently override the off-by-default behavior
-local hideUIGear = CreateFrame("Button", nil, frame)
-hideUIGear:SetSize(16, 16)
-hideUIGear:SetPoint("LEFT", hideUILabel, "RIGHT", 6, 0)
-hideUIGear:SetNormalTexture("Interface\\Icons\\Trade_Engineering")
-hideUIGear:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-
-local hideUIScopeNote = MakeFont(frame, "GameFontHighlightSmall", 9)
-hideUIScopeNote:SetPoint("LEFT", hideUIGear, "RIGHT", 6, 0)
-hideUIScopeNote:SetText(Color("(Only applies while this window is open)", COLORS.muted))
-
-local hideUISettingsPopup = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-hideUISettingsPopup:SetSize(230, 56)
-hideUISettingsPopup:SetPoint("TOPLEFT", hideUIGear, "BOTTOMLEFT", -20, -30)
-Mixin(hideUISettingsPopup, BackdropTemplateMixin)
-hideUISettingsPopup:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile = true,
-    tileSize = 16,
-    edgeSize = 12,
-    insets = {left = 3, right = 3, top = 3, bottom = 3},
-})
-hideUISettingsPopup:SetBackdropColor(0.015, 0.015, 0.015, 0.96)
-hideUISettingsPopup:SetBackdropBorderColor(0.35, 0.35, 0.35, 0.8)
-hideUISettingsPopup:SetFrameStrata("TOOLTIP")
-hideUISettingsPopup:Hide()
-
-local alwaysHideCheckbox = CreateFrame("CheckButton", nil, hideUISettingsPopup, "UICheckButtonTemplate")
-alwaysHideCheckbox:SetSize(20, 20)
-alwaysHideCheckbox:SetPoint("TOPLEFT", 8, -8)
-
-local alwaysHideLabel = MakeFont(hideUISettingsPopup, "GameFontHighlightSmall", 10)
-alwaysHideLabel:SetPoint("LEFT", alwaysHideCheckbox, "RIGHT", 4, 0)
-alwaysHideLabel:SetWidth(190)
-alwaysHideLabel:SetJustifyH("LEFT")
-alwaysHideLabel:SetText("Always hide WoW UI when this window opens")
-
-alwaysHideCheckbox:SetScript("OnClick", function(self)
-    local checked = self:GetChecked() and true or false
-    DungeonItemLevelsDB.alwaysHideWowUI = checked
-
-    if checked then
-        hideUICheckbox:SetChecked(true)
-        SetHideWowUI(true)
-    end
-end)
-
-hideUIGear:SetScript("OnClick", function()
-    if hideUISettingsPopup:IsShown() then
-        hideUISettingsPopup:Hide()
-    else
-        alwaysHideCheckbox:SetChecked(DungeonItemLevelsDB.alwaysHideWowUI and true or false)
-        hideUISettingsPopup:Show()
-    end
-end)
-
-hideUIGear:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Hide WoW UI Settings", 1, 1, 1)
-    GameTooltip:Show()
-end)
-hideUIGear:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-end)
+-- Frame Settings button: opens a popup (built further below, once main/side
+-- exist) covering both default WoW UI visibility and window transparency.
+local frameSettingsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+frameSettingsButton:SetSize(110, 20)
+frameSettingsButton:SetPoint("LEFT", hideUILabel, "RIGHT", 10, -1)
+frameSettingsButton:SetText("Frame Settings")
 
 frame:HookScript("OnShow", function()
     local defaultHidden = DungeonItemLevelsDB.alwaysHideWowUI and true or false
@@ -367,7 +317,6 @@ frame:HookScript("OnShow", function()
 end)
 
 frame:HookScript("OnHide", function()
-    hideUISettingsPopup:Hide()
     hideUICheckbox:SetChecked(false)
     SetHideWowUI(false)
 end)
@@ -458,40 +407,13 @@ if level12Key then
     level12Key:SetText("+12+")
 end
 
--- Extended Myth section
-local abyssPanel = CreatePanel(main, 644, 115, "BOTTOMLEFT", main, "BOTTOMLEFT", 18, 70)
-
-local abyssTitle = MakeFont(abyssPanel, "GameFontNormal", 12)
-abyssTitle:SetPoint("TOP", 0, -8)
-abyssTitle:SetText(Color("THE VENOMOUS ABYSS - EXTENDED MYTHIC ITEM LEVELS", COLORS.myth))
-
-local abyssHeaders = {
-    {"Rank", 60, 260},
-    {"Item Level", 324, 260},
-}
-for _, h in ipairs(abyssHeaders) do
-    local fs = MakeFont(abyssPanel, "GameFontNormal", 10)
-    fs:SetPoint("TOPLEFT", h[2], -26)
-    fs:SetWidth(h[3])
-    fs:SetJustifyH("CENTER")
-    fs:SetText(Color(h[1], COLORS.muted))
-end
-
-for i, row in ipairs(VENOMOUS_ABYSS_MYTH) do
-    local y = -42 - ((i - 1) * 20)
-
-    local rank = MakeFont(abyssPanel, "GameFontHighlight", 11)
-    rank:SetPoint("TOPLEFT", 60, y)
-    rank:SetWidth(260)
-    rank:SetJustifyH("CENTER")
-    rank:SetText(Color(row.rank, COLORS.myth))
-
-    local ilvl = MakeFont(abyssPanel, "GameFontHighlight", 11)
-    ilvl:SetPoint("TOPLEFT", 324, y)
-    ilvl:SetWidth(260)
-    ilvl:SetJustifyH("CENTER")
-    ilvl:SetText(Color(tostring(row.ilvl), COLORS.gold))
-end
+-- Note pointing to the new Ascendant Venomstones tab (the old extended-Myth
+-- table here was based on a misunderstanding of how the system works - see
+-- that tab for the accurate, currently-confirmed picture)
+local abyssPointer = MakeFont(main, "GameFontHighlightSmall", 10)
+abyssPointer:SetPoint("TOP", main, "TOP", 0, -380)
+abyssPointer:SetJustifyH("CENTER")
+abyssPointer:SetText(Color("Past Myth 6/6? See the ", COLORS.muted) .. Color("Ascendant Venomstones", COLORS.myth) .. Color(" tab.", COLORS.muted))
 
 -- Current keystone area
 frame.keystoneInfo = MakeFont(main, "GameFontHighlight", 11)
@@ -708,19 +630,185 @@ end
 local side = CreatePanel(frame, 530, 570, "TOPRIGHT", frame, "TOPRIGHT", -25, -82)
 frame.side = side
 
+-- Frame Settings popup: default WoW UI visibility + window transparency.
+-- The decorative backdrop textures (UI-DialogBox-Background etc.) have some
+-- softness/partial transparency baked into the image itself, which
+-- SetBackdropColor's alpha can only scale down, never restore past - so
+-- "Opaque" wasn't ever truly 100% solid. A plain solid-color texture layered
+-- just above the backdrop (but below all real content) sidesteps that
+-- entirely, since a flat color fill has no image and therefore no baked-in
+-- transparency to fight.
+local function CreateOpaqueBacking(parentFrame, inset)
+    local tex = parentFrame:CreateTexture(nil, "BORDER")
+    tex:SetPoint("TOPLEFT", inset, -inset)
+    tex:SetPoint("BOTTOMRIGHT", -inset, inset)
+    tex:SetColorTexture(0.01, 0.01, 0.01, 1)
+    return tex
+end
+
+local frameBacking = CreateOpaqueBacking(frame, 15)
+local mainBacking = CreateOpaqueBacking(main, 3)
+local sideBacking = CreateOpaqueBacking(side, 3)
+
+local BACKDROP_OPAQUE_ALPHA = {frame = 0.98, panel = 0.94}
+local BACKING_OPAQUE_ALPHA = 1
+
+local function ApplyWindowTransparencyValue(value)
+    local t = value / 100
+    local backingAlpha = BACKING_OPAQUE_ALPHA * (1 - t)
+    local backdropFrameAlpha = BACKDROP_OPAQUE_ALPHA.frame * (1 - t)
+    local backdropPanelAlpha = BACKDROP_OPAQUE_ALPHA.panel * (1 - t)
+
+    frameBacking:SetAlpha(backingAlpha)
+    mainBacking:SetAlpha(backingAlpha)
+    sideBacking:SetAlpha(backingAlpha)
+
+    frame:SetBackdropColor(0.005, 0.005, 0.005, backdropFrameAlpha)
+    main:SetBackdropColor(0.015, 0.015, 0.015, backdropPanelAlpha)
+    side:SetBackdropColor(0.015, 0.015, 0.015, backdropPanelAlpha)
+end
+
+local frameSettingsPopup = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+frameSettingsPopup:SetSize(380, 118)
+frameSettingsPopup:SetPoint("TOPLEFT", frameSettingsButton, "BOTTOMLEFT", -20, -8)
+Mixin(frameSettingsPopup, BackdropTemplateMixin)
+frameSettingsPopup:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true,
+    tileSize = 16,
+    edgeSize = 12,
+    insets = {left = 3, right = 3, top = 3, bottom = 3},
+})
+frameSettingsPopup:SetBackdropColor(0.015, 0.015, 0.015, 0.96)
+frameSettingsPopup:SetBackdropBorderColor(0.35, 0.35, 0.35, 0.8)
+frameSettingsPopup:SetFrameStrata("TOOLTIP")
+frameSettingsPopup:Hide()
+
+-- Default WoW UI visibility
+local alwaysHideCheckbox = CreateFrame("CheckButton", nil, frameSettingsPopup, "UICheckButtonTemplate")
+alwaysHideCheckbox:SetSize(20, 20)
+alwaysHideCheckbox:SetPoint("TOPLEFT", 10, -10)
+
+local alwaysHideLabel = MakeFont(frameSettingsPopup, "GameFontHighlightSmall", 10)
+alwaysHideLabel:SetPoint("LEFT", alwaysHideCheckbox, "RIGHT", 4, 0)
+alwaysHideLabel:SetWidth(340)
+alwaysHideLabel:SetJustifyH("LEFT")
+alwaysHideLabel:SetText("Always hide WoW UI when this window opens")
+
+alwaysHideCheckbox:SetScript("OnClick", function(self)
+    local checked = self:GetChecked() and true or false
+    DungeonItemLevelsDB.alwaysHideWowUI = checked
+
+    if checked then
+        hideUICheckbox:SetChecked(true)
+        SetHideWowUI(true)
+    end
+end)
+
+-- Window transparency: slider 0 (Opaque) to 100 (Transparent), with the two
+-- checkboxes as quick jumps to either end. The slider is the single source
+-- of truth - both checkboxes are kept in sync from its value, not the
+-- other way around, so they can never disagree with the actual setting.
+local transparencyLabel = MakeFont(frameSettingsPopup, "GameFontNormal", 11)
+transparencyLabel:SetPoint("TOPLEFT", 10, -42)
+transparencyLabel:SetText(Color("Window Transparency", COLORS.gold))
+
+local opaqueCheckbox = CreateFrame("CheckButton", nil, frameSettingsPopup, "UICheckButtonTemplate")
+opaqueCheckbox:SetSize(18, 18)
+opaqueCheckbox:SetPoint("TOPLEFT", 10, -66)
+
+local opaqueLabel = MakeFont(frameSettingsPopup, "GameFontHighlightSmall", 10)
+opaqueLabel:SetPoint("LEFT", opaqueCheckbox, "RIGHT", 2, 0)
+opaqueLabel:SetText("Opaque")
+
+local transparencySlider = CreateFrame("Slider", nil, frameSettingsPopup, "OptionsSliderTemplate")
+transparencySlider:SetSize(170, 16)
+transparencySlider:SetPoint("LEFT", opaqueLabel, "RIGHT", 10, -2)
+transparencySlider:SetMinMaxValues(0, 100)
+transparencySlider:SetValueStep(1)
+transparencySlider:SetObeyStepOnDrag(true)
+if transparencySlider.Low then transparencySlider.Low:SetText("") end
+if transparencySlider.High then transparencySlider.High:SetText("") end
+if transparencySlider.Text then transparencySlider.Text:SetText("") end
+
+local transparentCheckbox = CreateFrame("CheckButton", nil, frameSettingsPopup, "UICheckButtonTemplate")
+transparentCheckbox:SetSize(18, 18)
+transparentCheckbox:SetPoint("LEFT", transparencySlider, "RIGHT", 10, 2)
+
+local transparentLabel = MakeFont(frameSettingsPopup, "GameFontHighlightSmall", 10)
+transparentLabel:SetPoint("LEFT", transparentCheckbox, "RIGHT", 2, 0)
+transparentLabel:SetText("Transparent")
+
+opaqueCheckbox:SetScript("OnClick", function()
+    transparencySlider:SetValue(0)
+end)
+transparentCheckbox:SetScript("OnClick", function()
+    transparencySlider:SetValue(100)
+end)
+
+transparencySlider:SetScript("OnValueChanged", function(self, value)
+    value = math.floor(value + 0.5)
+    opaqueCheckbox:SetChecked(value == 0)
+    transparentCheckbox:SetChecked(value == 100)
+    ApplyWindowTransparencyValue(value)
+    DungeonItemLevelsDB.windowTransparencyValue = value
+end)
+
+transparencySlider:SetValue(0)
+
+frameSettingsButton:SetScript("OnClick", function()
+    if frameSettingsPopup:IsShown() then
+        frameSettingsPopup:Hide()
+    else
+        alwaysHideCheckbox:SetChecked(DungeonItemLevelsDB.alwaysHideWowUI and true or false)
+        transparencySlider:SetValue(DungeonItemLevelsDB.windowTransparencyValue or 0)
+        frameSettingsPopup:Show()
+    end
+end)
+
+frameSettingsButton:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Frame Settings", 1, 1, 1)
+    GameTooltip:AddLine("Set defaults for WoW UI visibility and window transparency.", 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+frameSettingsButton:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+end)
+
+frame:HookScript("OnShow", function()
+    transparencySlider:SetValue(DungeonItemLevelsDB.windowTransparencyValue or 0)
+end)
+
+frame:HookScript("OnHide", function()
+    frameSettingsPopup:Hide()
+end)
+
 local sideTitle = MakeFont(side, "GameFontNormal", 15)
 sideTitle:SetPoint("TOP", 0, -12)
 sideTitle:SetText(Color("Midnight 12.1 Information", COLORS.gold))
 
 local tabs = {}
 local tabPanels = {}
-local tabNames = {"Mistcrests", "Other Sources", "Upgrades", "Info"}
+local tabNames = {"Crest Tracker", "Crest Exchange", "Gear Upgrades / Crafting", "Upgrade Tracks", "Addon Info", "Ascendant Venomstones"}
+
+local TAB_WIDTH = 163
+local TAB_HEIGHT = 24
+local TAB_GAP = 6
+local TABS_PER_ROW = 3
 
 local function CreateTab(index, name)
     local tab = CreateFrame("Button", nil, side, "UIPanelButtonTemplate")
-    tab:SetSize(120, 24)
-    tab:SetPoint("TOPLEFT", 10 + ((index - 1) * 126), -38)
+    tab:SetSize(TAB_WIDTH, TAB_HEIGHT)
+    local row = math.floor((index - 1) / TABS_PER_ROW)
+    local col = (index - 1) % TABS_PER_ROW
+    tab:SetPoint("TOPLEFT", 10 + col * (TAB_WIDTH + TAB_GAP), -38 - row * (TAB_HEIGHT + 4))
     tab:SetText(name)
+    local fs = tab:GetFontString()
+    if fs then
+        fs:SetFont(fs:GetFont(), 10)
+    end
     tab:SetScript("OnClick", function()
         frame:SelectTab(index)
     end)
@@ -732,7 +820,7 @@ for i, name in ipairs(tabNames) do
 end
 
 local contentArea = CreateFrame("Frame", nil, side)
-contentArea:SetPoint("TOPLEFT", 10, -68)
+contentArea:SetPoint("TOPLEFT", 10, -96)
 contentArea:SetPoint("BOTTOMRIGHT", -10, 10)
 
 for i = 1, #tabNames do
@@ -772,6 +860,32 @@ local function EnableSmoothScroll(scrollFrame, step)
     end)
 end
 
+-- Builds a single exchange row: [from-crest icon] label text [to-crest icon].
+-- Returns the text fontstring so callers can recolor it (e.g. for achievement tracking).
+local function AddCrestExchangeRow(parent, y, fromTier, toTier, labelText)
+    local fromIcon = parent:CreateTexture(nil, "ARTWORK")
+    fromIcon:SetSize(16, 16)
+    fromIcon:SetPoint("TOPLEFT", 10, y)
+    local fromInfo = C_CurrencyInfo.GetCurrencyInfo(CREST_CURRENCY_ID[fromTier])
+    if fromInfo and fromInfo.iconFileID then
+        fromIcon:SetTexture(fromInfo.iconFileID)
+    end
+
+    local text = MakeFont(parent, "GameFontHighlightSmall", 10)
+    text:SetPoint("LEFT", fromIcon, "RIGHT", 4, 0)
+    text:SetText(labelText)
+
+    local toIcon = parent:CreateTexture(nil, "ARTWORK")
+    toIcon:SetSize(16, 16)
+    toIcon:SetPoint("LEFT", text, "RIGHT", 4, 0)
+    local toInfo = C_CurrencyInfo.GetCurrencyInfo(CREST_CURRENCY_ID[toTier])
+    if toInfo and toInfo.iconFileID then
+        toIcon:SetTexture(toInfo.iconFileID)
+    end
+
+    return text
+end
+
 -- Tab 1: Mistcrest sources
 local mistPanel = tabPanels[1]
 local mistScroll = CreateFrame("ScrollFrame", nil, mistPanel, "UIPanelScrollFrameTemplate")
@@ -788,6 +902,7 @@ frame.mistCrestCounts = {}
 frame.upgradeQuestTexts = {}
 frame.warbandAchievementTexts = {}
 frame.upgradeExchangeTexts = {}
+frame.tomtomNotes = {}
 
 local mistY = -2
 for _, crest in ipairs(MISTCREST_SOURCES) do
@@ -865,12 +980,10 @@ do
     h:SetPoint("TOPLEFT", 6, otherY)
     h:SetWidth(460)
     h:SetJustifyH("LEFT")
-    h:SetText(Color("Upgrade Vendors", COLORS.gold))
+    h:SetText(Color("Vaskarn - Mistcrest exchanges", COLORS.gold))
     otherY = otherY - 22
 
     local vendorLines = {
-        "Cuzolth - gear upgrades",
-        "Vaskarn - Mistcrest exchanges",
         "Silvermoon City, near the Sanctum of Light",
     }
     for _, line in ipairs(vendorLines) do
@@ -925,10 +1038,10 @@ do
     note:SetPoint("TOPLEFT", 10, otherY)
     note:SetWidth(450)
     note:SetJustifyH("LEFT")
-    frame.tomtomNote = note
-    otherY = otherY - 18
+    frame.tomtomNotes[#frame.tomtomNotes + 1] = note
+    otherY = otherY - 14
 
-    otherY = otherY - 10
+    otherY = otherY - 4
 end
 
 -- Vaskarn: Lower-Tier Exchanges (with quest completion tracking)
@@ -940,18 +1053,8 @@ do
     h:SetText(Color("Vaskarn: Lower-Tier Exchanges", COLORS.gold))
     otherY = otherY - 22
 
-    local exchangeLines = {
-        "10 Veteran -> 10 Adventurer",
-        "10 Champion -> 10 Veteran",
-        "10 Hero -> 10 Champion",
-        "10 Myth -> 10 Hero",
-    }
-    for _, line in ipairs(exchangeLines) do
-        local fs = MakeFont(otherChild, "GameFontHighlightSmall", 10)
-        fs:SetPoint("TOPLEFT", 10, otherY)
-        fs:SetWidth(450)
-        fs:SetJustifyH("LEFT")
-        fs:SetText(line)
+    for _, ex in ipairs(LOWER_TIER_EXCHANGES) do
+        AddCrestExchangeRow(otherChild, otherY, ex.fromTier, ex.toTier, "10 " .. ex.fromTier .. " -> 10 " .. ex.toTier)
         otherY = otherY - 18
     end
 
@@ -1011,18 +1114,22 @@ do
     h:SetText(Color("Vaskarn: Upgrade Exchange", COLORS.gold))
     otherY = otherY - 22
 
-    local noteLine = MakeFont(otherChild, "GameFontHighlightSmall", 10)
-    noteLine:SetPoint("TOPLEFT", 10, otherY)
-    noteLine:SetWidth(450)
-    noteLine:SetJustifyH("LEFT")
-    noteLine:SetText("Unlocked per-tier by the matching Warband achievement above. Counts toward the weekly cap.")
+    local noteLine1 = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+    noteLine1:SetPoint("TOPLEFT", 10, otherY)
+    noteLine1:SetWidth(450)
+    noteLine1:SetJustifyH("LEFT")
+    noteLine1:SetText("Unlocked per-tier by the matching achievement above.")
     otherY = otherY - 17
 
+    local noteLine2 = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+    noteLine2:SetPoint("TOPLEFT", 10, otherY)
+    noteLine2:SetWidth(450)
+    noteLine2:SetJustifyH("LEFT")
+    noteLine2:SetText("Counts toward the weekly cap.")
+    otherY = otherY - 20
+
     for _, entry in ipairs(UPGRADE_EXCHANGES) do
-        local fs = MakeFont(otherChild, "GameFontHighlightSmall", 10)
-        fs:SetPoint("TOPLEFT", 10, otherY)
-        fs:SetWidth(450)
-        fs:SetJustifyH("LEFT")
+        local fs = AddCrestExchangeRow(otherChild, otherY, entry.fromTier, entry.toTier, entry.text)
         frame.upgradeExchangeTexts[#frame.upgradeExchangeTexts + 1] = {achievementID = entry.achievementID, text = entry.text, fs = fs}
         otherY = otherY - 18
     end
@@ -1030,24 +1137,136 @@ do
     otherY = otherY - 10
 end
 
-AddInfoSection("Profession Crafting", {
-    "Rare: 266-279 - 80 Adventurer Mistcrests",
-    "Rare: 279-292 - 80 Veteran Mistcrests",
-    "Epic: 305-318 - 80 Hero Mistcrests",
-    "Epic: 318-331 - 80 Myth Mistcrests",
-})
+-- Tab 3: Gear Upgrades / Crafting
+local gearPanel = tabPanels[3]
+local gearY = -4
 
-AddInfoSection("Upgrade Rules", {
-    "1/6 -> 6/6 costs 100 Mistcrests total.",
-    "Each upgrade step costs 20 Mistcrests.",
-    "Free upgrades can match the highest item level you have earned for that armor slot.",
-})
+-- Upgrade Vendors (duplicate of the Crest Exchange tab's version, Cuzolth
+-- only - Vaskarn's exchanges are covered on the Crest Exchange tab instead)
+do
+    local h = MakeFont(gearPanel, "GameFontNormal", 12)
+    h:SetPoint("TOPLEFT", 6, gearY)
+    h:SetWidth(460)
+    h:SetJustifyH("LEFT")
+    h:SetText(Color("Cuzolth - gear upgrades", COLORS.gold))
+    gearY = gearY - 22
 
--- Tab 3: Upgrade tracks (3 x 2 Grid Layout)
-local upgradePanel = tabPanels[3]
-local upgradeTitle = MakeFont(upgradePanel, "GameFontNormal", 13)
-upgradeTitle:SetPoint("TOP", 0, -2)
-upgradeTitle:SetText(Color("12.1 Upgrade Tracks", COLORS.gold))
+    local vendorLines = {
+        "Silvermoon City, near the Sanctum of Light",
+    }
+    for _, line in ipairs(vendorLines) do
+        local fs = MakeFont(gearPanel, "GameFontHighlightSmall", 10)
+        fs:SetPoint("TOPLEFT", 10, gearY)
+        fs:SetWidth(450)
+        fs:SetJustifyH("LEFT")
+        fs:SetText(line)
+        gearY = gearY - 18
+    end
+
+    local WAYPOINT_MAP_ID = 2393
+    local WAYPOINT_X = 48.6
+    local WAYPOINT_Y = 61.7
+
+    local wayText = MakeFont(gearPanel, "GameFontHighlightSmall", 10)
+    wayText:SetPoint("TOPLEFT", 10, gearY)
+    wayText:SetWidth(150)
+    wayText:SetJustifyH("LEFT")
+    wayText:SetText("/way #" .. WAYPOINT_MAP_ID .. " " .. WAYPOINT_X .. " " .. WAYPOINT_Y)
+
+    local wayButton = CreateFrame("Button", nil, gearPanel, "UIPanelButtonTemplate")
+    wayButton:SetSize(90, 18)
+    wayButton:SetPoint("LEFT", wayText, "RIGHT", 8, 1)
+    wayButton:SetText("Set Waypoint")
+
+    wayButton:SetScript("OnClick", function()
+        if TomTom and TomTom.AddWaypoint then
+            TomTom:AddWaypoint(WAYPOINT_MAP_ID, WAYPOINT_X / 100, WAYPOINT_Y / 100, {
+                title = "Upgrade Vendors (Cuzolth / Vaskarn)",
+                persistent = false,
+            })
+            print(Color("Apple's Dungeon Item Levels: ", COLORS.gold) .. "Waypoint set for the Upgrade Vendors.")
+        else
+            print(Color("Apple's Dungeon Item Levels: ", COLORS.red) .. "TomTom addon not found. Install TomTom to use this button.")
+        end
+    end)
+
+    wayButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Set TomTom Waypoint", 1, 1, 1)
+        GameTooltip:AddLine("Cuzolth / Vaskarn - Upgrade Vendors", 0.8, 0.8, 0.8)
+        GameTooltip:Show()
+    end)
+    wayButton:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    gearY = gearY - 18
+
+    local note = MakeFont(gearPanel, "GameFontHighlightSmall", 9)
+    note:SetPoint("TOPLEFT", 10, gearY)
+    note:SetWidth(450)
+    note:SetJustifyH("LEFT")
+    frame.tomtomNotes[#frame.tomtomNotes + 1] = note
+    gearY = gearY - 14
+
+    gearY = gearY - 4
+end
+
+-- Upgrade Rules (moved here from Crest Exchange)
+do
+    local h = MakeFont(gearPanel, "GameFontNormal", 12)
+    h:SetPoint("TOPLEFT", 6, gearY)
+    h:SetWidth(460)
+    h:SetJustifyH("LEFT")
+    h:SetText(Color("Upgrade Rules", COLORS.gold))
+    gearY = gearY - 22
+
+    local ruleLines = {
+        "1/6 -> 6/6 costs 100 Mistcrests total.",
+        "Each upgrade step costs 20 Mistcrests.",
+        "Free upgrades can match the highest item level you have earned for that armor slot.",
+    }
+    for _, line in ipairs(ruleLines) do
+        local fs = MakeFont(gearPanel, "GameFontHighlightSmall", 10)
+        fs:SetPoint("TOPLEFT", 10, gearY)
+        fs:SetWidth(450)
+        fs:SetJustifyH("LEFT")
+        fs:SetText(line)
+        gearY = gearY - 18
+    end
+
+    gearY = gearY - 10
+end
+
+-- Profession Crafting (moved here from Crest Exchange)
+do
+    local h = MakeFont(gearPanel, "GameFontNormal", 12)
+    h:SetPoint("TOPLEFT", 6, gearY)
+    h:SetWidth(460)
+    h:SetJustifyH("LEFT")
+    h:SetText(Color("Profession Crafting", COLORS.gold))
+    gearY = gearY - 22
+
+    local craftLines = {
+        "Rare: 266-279 - 80 Adventurer Mistcrests",
+        "Rare: 279-292 - 80 Veteran Mistcrests",
+        "Epic: 305-318 - 80 Hero Mistcrests",
+        "Epic: 318-331 - 80 Myth Mistcrests",
+    }
+    for _, line in ipairs(craftLines) do
+        local fs = MakeFont(gearPanel, "GameFontHighlightSmall", 10)
+        fs:SetPoint("TOPLEFT", 10, gearY)
+        fs:SetWidth(450)
+        fs:SetJustifyH("LEFT")
+        fs:SetText(line)
+        gearY = gearY - 18
+    end
+
+    gearY = gearY - 10
+end
+
+-- Tab 4: Upgrade Tracks (3 x 2 Grid Layout)
+local upgradePanel = tabPanels[4]
 
 local gridSections = {
     { type = "track", data = UPGRADE_TRACKS[1] }, -- Adventurer
@@ -1055,7 +1274,6 @@ local gridSections = {
     { type = "track", data = UPGRADE_TRACKS[3] }, -- Champion
     { type = "track", data = UPGRADE_TRACKS[4] }, -- Hero
     { type = "track", data = UPGRADE_TRACKS[5] }, -- Myth
-    { type = "abyss", name = "Venomous Abyss" },   -- Abyss extensions
 }
 
 local colWidth = 160
@@ -1070,45 +1288,38 @@ for idx, sec in ipairs(gridSections) do
     local posX = startX + col * (colWidth + colGap)
     local posY = row == 0 and row1Y or row2Y
 
-    if sec.type == "track" then
-        local track = sec.data
-        local h = MakeFont(upgradePanel, "GameFontNormal", 11)
-        h:SetPoint("TOPLEFT", posX, posY)
-        h:SetWidth(colWidth)
-        h:SetText(Color(track.name, TrackColor(track.name)))
+    local track = sec.data
 
-        local trackY = posY - 18
-        for rank = 1, 6 do
-            local fs = MakeFont(upgradePanel, "GameFontHighlightSmall", 10)
-            fs:SetPoint("TOPLEFT", posX, trackY)
-            fs:SetWidth(colWidth)
-            fs:SetText(
-                Color(rank .. "/6", COLORS.white)
-                .. " "
-                .. Color(tostring(track.levels[rank]), COLORS.gold)
-                .. (rank == 1 and Color(" (base)", COLORS.muted) or Color(" +20", COLORS.muted))
-            )
-            trackY = trackY - 16
-        end
-    elseif sec.type == "abyss" then
-        local h = MakeFont(upgradePanel, "GameFontNormal", 11)
-        h:SetPoint("TOPLEFT", posX, posY)
-        h:SetWidth(colWidth)
-        h:SetText(Color("Venomous Abyss", COLORS.myth))
+    local icon = upgradePanel:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(14, 14)
+    icon:SetPoint("TOPLEFT", posX, posY - 1)
+    local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(track.currencyID)
+    if currencyInfo and currencyInfo.iconFileID then
+        icon:SetTexture(currencyInfo.iconFileID)
+    end
 
-        local extY = posY - 18
-        for _, rowData in ipairs(VENOMOUS_ABYSS_MYTH) do
-            local fs = MakeFont(upgradePanel, "GameFontHighlightSmall", 10)
-            fs:SetPoint("TOPLEFT", posX, extY)
-            fs:SetWidth(colWidth)
-            fs:SetText(Color(rowData.rank, COLORS.myth) .. " " .. Color(tostring(rowData.ilvl) .. " ilvl", COLORS.gold))
-            extY = extY - 18
-        end
+    local h = MakeFont(upgradePanel, "GameFontNormal", 11)
+    h:SetPoint("TOPLEFT", posX + 16, posY)
+    h:SetWidth(colWidth - 16)
+    h:SetJustifyH("LEFT")
+    h:SetText(Color(track.name, TrackColor(track.name)))
+
+    local trackY = posY - 18
+    for rank = 1, 6 do
+        local fs = MakeFont(upgradePanel, "GameFontHighlightSmall", 10)
+        fs:SetPoint("TOPLEFT", posX, trackY)
+        fs:SetWidth(colWidth)
+        fs:SetText(
+            Color(rank .. "/6", COLORS.white)
+            .. " "
+            .. Color(tostring(track.levels[rank]), COLORS.gold)
+        )
+        trackY = trackY - 16
     end
 end
 
--- Tab 4: Info
-local infoPanel = tabPanels[4]
+-- Tab 5: Addon Info
+local infoPanel = tabPanels[5]
 local infoText = MakeFont(infoPanel, "GameFontHighlightSmall", 10)
 infoText:SetPoint("TOPLEFT", 6, -4)
 infoText:SetPoint("TOPRIGHT", -6, -4)
@@ -1128,7 +1339,65 @@ infoText:SetText(
     .. "and displays its dungeon, end-of-dungeon loot, and Great Vault reward level.\n\n"
     .. Color("Data note", COLORS.gold) .. "\n"
     .. "Mistcrest amounts by individual M+ level are not hard-coded because the current\n"
-    .. "Season 2 guide marks those amounts as unconfirmed. The crest tier is shown instead."
+    .. "Season 2 guide marks those amounts as unconfirmed. The crest tier is shown instead.\n\n"
+    .. Color("Feedback", COLORS.gold) .. "\n"
+    .. "Found an issue, or have a feature request? Please leave a comment on the addon's\n"
+    .. "CurseForge project page - it's the best way to reach the author."
+)
+
+-- Tab 6: Ascendant Venomstones
+local venomPanel = tabPanels[6]
+local venomScroll = CreateFrame("ScrollFrame", nil, venomPanel, "UIPanelScrollFrameTemplate")
+venomScroll:SetPoint("TOPLEFT", 0, 0)
+venomScroll:SetPoint("BOTTOMRIGHT", -20, 0)
+
+local venomChild = CreateFrame("Frame", nil, venomScroll)
+venomChild:SetWidth(480)
+venomChild:SetHeight(700)
+venomScroll:SetScrollChild(venomChild)
+EnableSmoothScroll(venomScroll, 20)
+
+local venomText = MakeFont(venomChild, "GameFontHighlightSmall", 10)
+venomText:SetPoint("TOPLEFT", 6, -4)
+venomText:SetWidth(460)
+venomText:SetJustifyH("LEFT")
+venomText:SetSpacing(3)
+venomText:SetText(
+    Color("Ascendant Venomstones", COLORS.myth) .. "\n\n"
+    .. Color("NOT YET AVAILABLE THIS SEASON", COLORS.red) .. "\n"
+    .. "Ascendant Venomstones, the equivalent of Season 1's Ascendant Voidcore, are\n"
+    .. "planned to return later into Midnight Season 2. They are confirmed not\n"
+    .. "available yet.\n\n"
+    .. Color("How It Works", COLORS.gold) .. "\n"
+    .. "- Costs 10 Ascendant Venomstones per item.\n"
+    .. "- Eligible items: Weapons, Trinkets, and Necklaces only.\n"
+    .. "- The item must already be fully upgraded (6/6) on its Hero or Myth\n"
+    .. "  track, or be a maximum-quality Radiance crafted item.\n"
+    .. "- This is a one-time upgrade, not an incremental rank. Once applied,\n"
+    .. "  the item gains \"Ascendant\" status and cannot be upgraded further.\n\n"
+    .. Color("Where To Get Them (100% drop rate)", COLORS.gold) .. "\n"
+    .. "- Heroic or Mythic Venomous Abyss raid boss kills\n"
+    .. "- Mythic+ Dungeons at +10 or higher\n"
+    .. "- Tier 11 Bountiful Delves\n"
+    .. "- The first 2 Nightmare-difficulty Prey Hunts each week\n\n"
+    .. Color("Resulting Item Level - Unconfirmed", COLORS.red) .. "\n"
+    .. "Blizzard has not published the exact item level an Ascendant upgrade\n"
+    .. "results in. We currently assume a maxed 6/6 Myth item (ilvl 334) would\n"
+    .. "upgrade to somewhere around 341 or 344, but this is not officially\n"
+    .. "confirmed and should not be treated as fact until verified.\n\n"
+    .. Color("Examples", COLORS.gold) .. "\n"
+    .. "6/6 Hero (ilvl 321) + 10 Venomstones -> " .. Color("Unconfirmed", COLORS.red) .. "\n"
+    .. "6/6 Myth (ilvl 334) + 10 Venomstones -> " .. Color("Unconfirmed (assumed 341 or 344)", COLORS.red) .. "\n\n"
+    .. Color("The Confirmed 344 Ceiling", COLORS.gold) .. "\n"
+    .. "The final two Mythic Venomous Abyss bosses, and Very Rare item drops,\n"
+    .. "award \"Venomcursed\" gear directly at ilvl 344. This gear drops already\n"
+    .. "at its maximum and has no further upgrade path - it isn't reached by\n"
+    .. "upgrading a lower item, only by looting it directly.\n\n"
+    .. Color("Coming Later", COLORS.gold) .. "\n"
+    .. "A table showing which of your currently owned items would be eligible\n"
+    .. "for an Ascendant Venomstone upgrade is planned for a future update,\n"
+    .. "once Ascendant Venomstones actually release and their mechanics can\n"
+    .. "be confirmed."
 )
 
 -- Toggle button for side sheet
@@ -1259,15 +1528,17 @@ end
 
 -- TomTom detection - only warn if it's actually missing
 local function UpdateTomTomNote()
-    if not frame.tomtomNote then
+    if not frame.tomtomNotes then
         return
     end
 
-    if TomTom and TomTom.AddWaypoint then
-        frame.tomtomNote:Hide()
-    else
-        frame.tomtomNote:SetText(Color("TomTom addon not detected - enable/install it to use this waypoint button.", COLORS.red))
-        frame.tomtomNote:Show()
+    for _, note in ipairs(frame.tomtomNotes) do
+        if TomTom and TomTom.AddWaypoint then
+            note:Hide()
+        else
+            note:SetText(Color("TomTom addon not detected - enable/install it to use this waypoint button.", COLORS.red))
+            note:Show()
+        end
     end
 end
 

@@ -3,7 +3,7 @@
 ## Notes: Displays Midnight Season 2 Mythic+ loot, Great Vault rewards, Mistcrest sources, and gear upgrade tracks.
 ## Author: nt.Apple
 ## DefaultState: enabled
-## Version: 12.1.0.14
+## Version: 12.1.0.15
 ## IconTexture: Interface\MINIMAP\Dungeon_Icon.PNG
 ## SavedVariables: DungeonItemLevelsDB
 ## X-Wago-ID: rNkyl3Ka
