@@ -158,6 +158,17 @@ local UPGRADE_UNLOCK_QUESTS = {
     {name = "Upgrade Practicum (Quest)", questID = 96635},
 }
 
+-- Achievement-gated upgrade exchanges (Vaskarn): trades 30 of a lower-tier
+-- Mistcrest for 10 of the next tier up. Counts toward the weekly cap, unlike
+-- the quest-gated Lower-Tier Exchanges. Each is unlocked by the Warband
+-- achievement for the tier being exchanged FROM.
+local UPGRADE_EXCHANGES = {
+    {text = "30 Adventurer -> 10 Veteran", achievementID = 62410},
+    {text = "30 Veteran -> 10 Champion", achievementID = 62411},
+    {text = "30 Champion -> 10 Hero", achievementID = 62412},
+    {text = "30 Hero -> 10 Myth", achievementID = 62414},
+}
+
 local function MakeFont(parent, template, size)
     local fs = parent:CreateFontString(nil, "OVERLAY", template or "GameFontHighlight")
     if size then
@@ -776,6 +787,7 @@ EnableSmoothScroll(mistScroll, 20)
 frame.mistCrestCounts = {}
 frame.upgradeQuestTexts = {}
 frame.warbandAchievementTexts = {}
+frame.upgradeExchangeTexts = {}
 
 local mistY = -2
 for _, crest in ipairs(MISTCREST_SOURCES) do
@@ -984,6 +996,34 @@ do
         fs:SetWidth(450)
         fs:SetJustifyH("LEFT")
         frame.warbandAchievementTexts[#frame.warbandAchievementTexts + 1] = {achievementID = entry.achievementID, text = entry.text, fs = fs}
+        otherY = otherY - 18
+    end
+
+    otherY = otherY - 10
+end
+
+-- Vaskarn: Upgrade Exchange (achievement-gated, counts toward weekly cap)
+do
+    local h = MakeFont(otherChild, "GameFontNormal", 12)
+    h:SetPoint("TOPLEFT", 6, otherY)
+    h:SetWidth(460)
+    h:SetJustifyH("LEFT")
+    h:SetText(Color("Vaskarn: Upgrade Exchange", COLORS.gold))
+    otherY = otherY - 22
+
+    local noteLine = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+    noteLine:SetPoint("TOPLEFT", 10, otherY)
+    noteLine:SetWidth(450)
+    noteLine:SetJustifyH("LEFT")
+    noteLine:SetText("Unlocked per-tier by the matching Warband achievement above. Counts toward the weekly cap.")
+    otherY = otherY - 17
+
+    for _, entry in ipairs(UPGRADE_EXCHANGES) do
+        local fs = MakeFont(otherChild, "GameFontHighlightSmall", 10)
+        fs:SetPoint("TOPLEFT", 10, otherY)
+        fs:SetWidth(450)
+        fs:SetJustifyH("LEFT")
+        frame.upgradeExchangeTexts[#frame.upgradeExchangeTexts + 1] = {achievementID = entry.achievementID, text = entry.text, fs = fs}
         otherY = otherY - 18
     end
 
@@ -1199,15 +1239,21 @@ local function UpdateUpgradeQuests()
     end
 end
 
--- Warband discount achievement tracker
+-- Warband discount achievement tracker (also drives the Upgrade Exchange
+-- section, since both are gated by the same achievements)
 local function UpdateWarbandAchievements()
-    if not frame.warbandAchievementTexts then
-        return
+    if frame.warbandAchievementTexts then
+        for _, entry in ipairs(frame.warbandAchievementTexts) do
+            local completed = select(4, GetAchievementInfo(entry.achievementID))
+            entry.fs:SetText(Color(entry.text, completed and COLORS.veteran or COLORS.red))
+        end
     end
 
-    for _, entry in ipairs(frame.warbandAchievementTexts) do
-        local completed = select(4, GetAchievementInfo(entry.achievementID))
-        entry.fs:SetText(Color(entry.text, completed and COLORS.veteran or COLORS.red))
+    if frame.upgradeExchangeTexts then
+        for _, entry in ipairs(frame.upgradeExchangeTexts) do
+            local completed = select(4, GetAchievementInfo(entry.achievementID))
+            entry.fs:SetText(Color(entry.text, completed and COLORS.veteran or COLORS.red))
+        end
     end
 end
 
